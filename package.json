@@ -1,0 +1,36 @@
+{
+  "name": "lanhu-to-code",
+  "version": "1.0.0",
+  "description": "Claude Code Skill — 根据蓝湖链接或设计稿图片，生成 1:1 像素级还原的前端代码，自动识别项目技术栈",
+  "keywords": [
+    "claude-code",
+    "skill",
+    "lanhu",
+    "design-to-code",
+    "pixel-perfect",
+    "frontend",
+    "vue",
+    "react",
+    "uni-app"
+  ],
+  "license": "MIT",
+  "author": "",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "bin": {
+    "lanhu-to-code": "./install.js"
+  },
+  "scripts": {
+    "postinstall": "node install.js",
+    "install-skill": "node install.js"
+  },
+  "files": [
+    "SKILL.md",
+    "scripts/**",
+    "references/**",
+    "install.js"
+  ],
+  "dependencies": {}
+}
