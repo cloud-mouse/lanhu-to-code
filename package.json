@@ -17,7 +17,7 @@
   "author": "",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/cloud-mouse/lanhu-to-code.git"
   },
   "bin": {
     "lanhu-to-code": "./install.js"

@@ -75,7 +75,7 @@ npm install -g lanhu-to-code
 
 ```bash
 # 克隆仓库
-git clone https://github.com/YOUR_USERNAME/lanhu-to-code.git
+git clone https://github.com/cloud-mouse/lanhu-to-code.git
 
 # 复制到 Claude Code skills 目录
 cp -r lanhu-to-code ~/.claude/skills/lanhu-to-code
@@ -84,7 +84,7 @@ cp -r lanhu-to-code ~/.claude/skills/lanhu-to-code
 ### 方式四：从源码链接（适合开发者）
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/lanhu-to-code.git
+git clone https://github.com/cloud-mouse/lanhu-to-code.git
 cd lanhu-to-code
 node install.js   # 创建符号链接到 ~/.claude/skills/
 ```
