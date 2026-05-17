@@ -162,16 +162,33 @@ lanhu-to-code/
 - 蓝湖设计稿链接（推荐）或设计图截图
 - 如果使用蓝湖链接，需配置蓝湖 MCP Server
 
-### 蓝湖 MCP 配置
+### 蓝湖 MCP Server 安装
 
-在 Claude Code 的 MCP 配置中添加蓝湖服务器：
+本 skill 依赖 [lanhu-mcp](https://github.com/dsphper/lanhu-mcp) 获取蓝湖设计稿数据。
+
+**1. 安装 lanhu-mcp（二选一）**
+
+```bash
+# 方式 A：Docker（推荐）
+git clone https://github.com/dsphper/lanhu-mcp.git && cd lanhu-mcp
+bash setup-env.sh          # 交互式引导配置 Cookie
+docker-compose up -d
+
+# 方式 B：源码运行（需 Python 3.10+）
+git clone https://github.com/dsphper/lanhu-mcp.git && cd lanhu-mcp
+pip install -r requirements.txt && playwright install chromium
+export LANHU_COOKIE="你的蓝湖Cookie"   # 从浏览器开发者工具获取
+python lanhu_mcp_server.py
+```
+
+**2. 在 Claude Code 中配置 MCP**
 
 ```json
 {
   "mcpServers": {
     "lanhu": {
-      "command": "npx",
-      "args": ["-y", "@anthropic-ai/lanhu-mcp-server"]
+      "type": "http",
+      "url": "http://localhost:8000/mcp?role=Developer&name=YourName"
     }
   }
 }
