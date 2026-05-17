@@ -102,12 +102,13 @@ PACKAGE_MANAGER: pnpm
    - URL 含 `&id=` 或 `&did=` → 直接使用
    - URL 只有 `pid=` → 调用 `lanhu_design` 的 `list` 模式展示设计列表，等用户选择
 
-2. **获取设计数据**
+2. **获取设计数据（使用 compact 模式防止上下文爆炸）**
    调用 `mcp__lanhu__lanhu_design`，参数：
    - `url`: 蓝湖页面 URL
    - `mode`: "analyze"
    - `design_names`: 具体页面名或序号
    - `include`: ["html", "tokens", "layers", "image"]
+   - `compact`: true — **关键！** HTML 代码保存到文件不内联到上下文，避免触发自动压缩
 
 3. **获取切图**（如有）
    调用 `mcp__lanhu__lanhu_design`，参数：
@@ -115,6 +116,8 @@ PACKAGE_MANAGER: pnpm
    - `design_names`: 同上
 
 4. **保存产物**到 `.claude/lanhu-output/<页面名称>/`
+
+**上下文管理：** compact 模式下，设计稿 HTML/CSS 代码保存到磁盘文件，不会加载到对话上下文中。后续步骤（4-9）需要 CSS 数值时，从磁盘读取 `.claude/lanhu-output/<页面名称>/` 中已保存的 HTML 文件，而非依赖上下文中的内联数据。
 
 ### 输入 B：设计图图片
 
@@ -137,6 +140,7 @@ PACKAGE_MANAGER: pnpm
 ## 第四步：页面整体属性提取（强制检查点 #1）
 
 **在任何元素分析之前，先提取页面级别的全局属性。这是防止页面背景色丢失的关键步骤。**
+**数据来源：从第三步保存的 HTML 文件中读取页面根元素的 CSS 属性。**
 
 ### 4.1 页面背景色
 
@@ -173,6 +177,8 @@ PACKAGE_MANAGER: pnpm
 
 分类规则、决策树、勾选清单格式、切图处理方式 → 读 `references/element-classification.md`
 
+**数据来源：从保存的 HTML 文件中读取所有元素的 CSS 类和属性，结合 Design Tokens 补充渐变/边框/阴影信息。**
+
 **输出勾选清单后，等待用户确认再继续。**
 
 ---
@@ -180,6 +186,7 @@ PACKAGE_MANAGER: pnpm
 ## 第六步：CSS 值对照表（强制检查点 #3）
 
 **在写任何样式代码之前，必须完成此步骤。**
+**数据来源：从保存的 HTML 文件中逐一提取每个 CSS 类的属性值，不要凭记忆或截图猜测。**
 
 子元素粒度颜色提取、布局方向确认、数据驱动尺寸计算等详细规则 → 读 `references/css-value-extraction.md`
 
@@ -229,6 +236,7 @@ PACKAGE_MANAGER: pnpm
 ### 8.0 Layer Tree 结构还原
 
 从 layer tree 中理解元素的嵌套和兄弟关系，确定 HTML 结构：
+**数据来源：从保存的 HTML 文件的 DOM 结构和 CSS 类名中推断层级关系。**
 
 1. **读取 layer tree 的层级关系**
    - 父子关系 → 嵌套的 HTML 容器
