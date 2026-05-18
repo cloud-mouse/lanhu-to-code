@@ -1,5 +1,6 @@
 ---
 name: lanhu-to-code
+version: 1.1.0
 description: |
   根据蓝湖链接或设计稿图片，生成 1:1 像素级还原的前端代码。自动识别当前项目技术栈（Vue/React/Angular/Svelte/uni-app/小程序等）。
   Use when user provides a Lanhu (蓝湖) URL or design screenshot/mockup image and wants to convert it to frontend code.
@@ -8,6 +9,8 @@ description: |
 ---
 
 # lanhu-to-code
+
+> v1.1.0
 
 根据蓝湖链接或设计稿图片，自动识别项目技术栈，生成 1:1 像素级还原的前端代码。
 

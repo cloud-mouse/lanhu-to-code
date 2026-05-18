@@ -75,6 +75,32 @@ cd lanhu-to-code
 node install.js   # 创建符号链接到 ~/.claude/skills/
 ```
 
+### 更新
+
+```bash
+# npx / npm 全局安装（自动更新到最新版）
+npx lanhu-to-code
+
+# 源码安装
+cd lanhu-to-code && git pull && node install.js
+```
+
+### 卸载
+
+```bash
+# 从源码目录
+node install.js --uninstall
+
+# 或手动删除
+rm -rf ~/.claude/skills/lanhu-to-code
+```
+
+### 查看版本
+
+```bash
+node install.js --version
+```
+
 ## 使用方式
 
 安装后，在 Claude Code 中打开你的前端项目，然后：
