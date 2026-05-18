@@ -111,9 +111,26 @@ function install() {
     }
   }
 
+  // --- 备份已有安装（非符号链接时） ---
+  function backupExisting() {
+    if (!fs.existsSync(TARGET_DIR)) return
+    const isSymlink = fs.lstatSync(TARGET_DIR).isSymbolicLink()
+    if (!isSymlink) {
+      const backupDir = TARGET_DIR + '.bak'
+      if (fs.existsSync(backupDir)) {
+        fs.rmSync(backupDir, { recursive: true, force: true })
+      }
+      fs.renameSync(TARGET_DIR, backupDir)
+      console.log(`📦 已备份旧安装到: ${backupDir}`)
+    }
+  }
+
   try {
     // 尝试创建符号链接（优先）
     try {
+      if (fs.existsSync(TARGET_DIR)) {
+        backupExisting()
+      }
       if (fs.existsSync(TARGET_DIR)) {
         fs.rmSync(TARGET_DIR, { recursive: true, force: true })
       }
@@ -122,7 +139,7 @@ function install() {
     } catch (e) {
       // 符号链接失败，回退到文件复制
       if (fs.existsSync(TARGET_DIR)) {
-        fs.rmSync(TARGET_DIR, { recursive: true, force: true })
+        backupExisting()
       }
       fs.mkdirSync(TARGET_DIR, { recursive: true })
       copyRecursive(SOURCE_DIR, TARGET_DIR)
@@ -182,6 +199,10 @@ function uninstall() {
 // ─── 安装记录 ────────────────────────────────────────────────
 
 function writeInstallRecord() {
+  // 符号链接模式下不写入记录文件，避免污染源码目录
+  if (fs.existsSync(TARGET_DIR) && fs.lstatSync(TARGET_DIR).isSymbolicLink()) {
+    return
+  }
   const record = {
     version: VERSION,
     installedAt: new Date().toISOString(),
@@ -189,7 +210,6 @@ function writeInstallRecord() {
   }
   const recordPath = path.join(TARGET_DIR, '.install-record.json')
   try {
-    // 如果 TARGET_DIR 是符号链接，记录写到 SOURCE_DIR（实际文件位置）
     fs.writeFileSync(recordPath, JSON.stringify(record, null, 2), 'utf8')
   } catch (e) {
     // 写入失败不影响安装

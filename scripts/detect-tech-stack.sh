@@ -14,10 +14,10 @@ fi
 # 检查 package.json 的 dependencies/devDependencies 中是否包含某个依赖
 has_dep() {
   [ -f "$PROJECT_ROOT/package.json" ] || return 1
-  node -e "
-    const pkg = require('$PROJECT_ROOT/package.json');
+  PROJECT_ROOT="$PROJECT_ROOT" DEP_NAME="$1" node -e "
+    const pkg = require(process.env.PROJECT_ROOT + '/package.json');
     const deps = Object.assign({}, pkg.dependencies, pkg.devDependencies);
-    process.exit(deps['$1'] ? 0 : 1);
+    process.exit(deps[process.env.DEP_NAME] ? 0 : 1);
   " 2>/dev/null
 }
 
@@ -48,8 +48,8 @@ elif has_dep "nuxt"; then
 
 # Vue（从 package.json 版本号检测，不依赖 node_modules）
 elif has_dep "vue"; then
-  VUE_VER=$(node -e "
-    const pkg = require('$PROJECT_ROOT/package.json');
+  VUE_VER=$(PROJECT_ROOT="$PROJECT_ROOT" node -e "
+    const pkg = require(process.env.PROJECT_ROOT + '/package.json');
     const deps = Object.assign({}, pkg.dependencies, pkg.devDependencies);
     const ver = deps['vue'] || '';
     const m = ver.match(/[~^]?(\\d+)/);
@@ -80,11 +80,11 @@ elif has_dep "svelte"; then
 
 # 无 package.json 时，从文件结构推断
 elif [ ! -f "$PROJECT_ROOT/package.json" ]; then
-  if has_file "src/pages.json" || has_file "pages.json"; then
+  if has_file "src/pages.json" || has_file "pages.json" || has_file "app.json"; then
     FRAMEWORK="mini-program"  # 小程序
-  elif find "$PROJECT_ROOT/src" -name "*.vue" -print -quit 2>/dev/null | grep -q .; then
+  elif find "$PROJECT_ROOT/src" -maxdepth 3 -name "*.vue" -print -quit 2>/dev/null | grep -q .; then
     FRAMEWORK="vue"
-  elif find "$PROJECT_ROOT/src" -name "*.tsx" -print -quit 2>/dev/null | grep -q .; then
+  elif find "$PROJECT_ROOT/src" -maxdepth 3 -name "*.tsx" -print -quit 2>/dev/null | grep -q .; then
     FRAMEWORK="react"
   elif has_file "angular.json" || has_file "src/app/app.module.ts"; then
     FRAMEWORK="angular"
@@ -184,7 +184,7 @@ fi
 TYPESCRIPT="false"
 
 if has_dep "typescript" || has_file "tsconfig.json" || \
-   find "$PROJECT_ROOT/src" -name "*.ts" -print -quit 2>/dev/null | grep -q .; then
+   find "$PROJECT_ROOT/src" -maxdepth 3 -name "*.ts" -print -quit 2>/dev/null | grep -q .; then
   TYPESCRIPT="true"
 fi
 

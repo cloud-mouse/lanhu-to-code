@@ -32,5 +32,8 @@
     "references/**",
     "install.js"
   ],
+  "engines": {
+    "node": ">=14.0.0"
+  },
   "dependencies": {}
 }
