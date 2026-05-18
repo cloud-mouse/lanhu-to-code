@@ -3,9 +3,18 @@ name: lanhu-to-code
 version: 1.1.0
 description: |
   根据蓝湖链接或设计稿图片，生成 1:1 像素级还原的前端代码。自动识别当前项目技术栈（Vue/React/Angular/Svelte/uni-app/小程序等）。
-  Use when user provides a Lanhu (蓝湖) URL or design screenshot/mockup image and wants to convert it to frontend code.
-  Also use when user says "还原这个设计稿", "蓝湖转代码", "按设计稿生成页面", "pixel-perfect", "切图", "设计稿还原",
-  or provides an image/screenshot of a UI design and asks to build it.
+
+  TRIGGER — 满足以下任一条件即触发：
+  1. 用户消息包含蓝湖 URL（lanhuapp.com）
+  2. 用户提供了图片/截图文件路径（.png/.jpg/.jpeg/.webp/.svg）并要求生成页面或组件
+  3. 用户说了以下关键词（含但不限于）：还原设计稿、蓝湖转代码、按设计稿生成页面、
+     pixel-perfect、切图、设计稿还原、UI还原、设计还原、蓝湖链接、图转代码、截图转代码、
+     照着这个做、按这个图写页面、把这个设计稿写出来、帮我写这个页面
+
+  Do NOT trigger when:
+  - 用户仅在讨论/查看设计标注，未要求生成代码
+  - 用户在纯后端/非前端项目上下文中提供蓝湖链接
+  - 用户显式要求使用 design-to-code 三阶段工作流
 ---
 
 # lanhu-to-code
