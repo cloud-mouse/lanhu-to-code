@@ -11,9 +11,14 @@ if [ ! -d "$PROJECT_ROOT" ]; then
 fi
 
 # ─── 辅助函数 ────────────────────────────────────────────────
-# 检查 package.json 中是否包含某个依赖
+# 检查 package.json 的 dependencies/devDependencies 中是否包含某个依赖
 has_dep() {
-  [ -f "$PROJECT_ROOT/package.json" ] && grep -q "\"$1\"" "$PROJECT_ROOT/package.json" 2>/dev/null
+  [ -f "$PROJECT_ROOT/package.json" ] || return 1
+  node -e "
+    const pkg = require('$PROJECT_ROOT/package.json');
+    const deps = Object.assign({}, pkg.dependencies, pkg.devDependencies);
+    process.exit(deps['$1'] ? 0 : 1);
+  " 2>/dev/null
 }
 
 # 检查某个文件是否存在
@@ -43,7 +48,13 @@ elif has_dep "nuxt"; then
 
 # Vue（从 package.json 版本号检测，不依赖 node_modules）
 elif has_dep "vue"; then
-  VUE_VER=$(grep -E '"vue"\s*:' "$PROJECT_ROOT/package.json" | grep -oE '[~^]?[0-9]+' | head -1 | tr -d '~^')
+  VUE_VER=$(node -e "
+    const pkg = require('$PROJECT_ROOT/package.json');
+    const deps = Object.assign({}, pkg.dependencies, pkg.devDependencies);
+    const ver = deps['vue'] || '';
+    const m = ver.match(/[~^]?(\\d+)/);
+    console.log(m ? m[1] : '');
+  " 2>/dev/null)
   if [ "$VUE_VER" = "3" ]; then
     FRAMEWORK="vue3"
   elif [ "$VUE_VER" = "2" ] || [ "$VUE_VER" = "1" ]; then
@@ -71,9 +82,9 @@ elif has_dep "svelte"; then
 elif [ ! -f "$PROJECT_ROOT/package.json" ]; then
   if has_file "src/pages.json" || has_file "pages.json"; then
     FRAMEWORK="mini-program"  # 小程序
-  elif ls "$PROJECT_ROOT"/src/**/*.vue 2>/dev/null | head -1 > /dev/null; then
+  elif find "$PROJECT_ROOT/src" -name "*.vue" -print -quit 2>/dev/null | grep -q .; then
     FRAMEWORK="vue"
-  elif ls "$PROJECT_ROOT"/src/**/*.tsx 2>/dev/null | head -1 > /dev/null; then
+  elif find "$PROJECT_ROOT/src" -name "*.tsx" -print -quit 2>/dev/null | grep -q .; then
     FRAMEWORK="react"
   elif has_file "angular.json" || has_file "src/app/app.module.ts"; then
     FRAMEWORK="angular"
@@ -173,7 +184,7 @@ fi
 TYPESCRIPT="false"
 
 if has_dep "typescript" || has_file "tsconfig.json" || \
-   ls "$PROJECT_ROOT"/src/**/*.ts 2>/dev/null | head -1 > /dev/null; then
+   find "$PROJECT_ROOT/src" -name "*.ts" -print -quit 2>/dev/null | grep -q .; then
   TYPESCRIPT="true"
 fi
 

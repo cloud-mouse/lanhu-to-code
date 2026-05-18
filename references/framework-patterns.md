@@ -228,6 +228,123 @@ Page({
 
 ---
 
+## Angular
+
+### 组件模板
+
+```typescript
+// component-name.component.ts
+import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core'
+
+@Component({
+  selector: 'app-component-name',
+  templateUrl: './component-name.component.html',
+  styleUrls: ['./component-name.component.scss'],
+})
+export class ComponentNameComponent implements OnInit {
+  @Input() title = ''
+  @Output() action = new EventEmitter<number>()
+
+  loading = false
+
+  ngOnInit(): void {
+    this.loadData()
+  }
+
+  handleClick(id: number): void {
+    this.action.emit(id)
+  }
+
+  private async loadData(): Promise<void> {
+    this.loading = true
+    try {
+      // TODO: 加载数据
+    } finally {
+      this.loading = false
+    }
+  }
+}
+```
+
+```html
+<!-- component-name.component.html -->
+<div class="page-name">
+  <div class="header">
+    <h1 class="title">{{ title }}</h1>
+  </div>
+</div>
+```
+
+**Angular 注意事项：**
+- 使用 `ng-content` 做内容投影
+- 样式封装默认 `Emulated`，按需使用 `:host` 选择器
+- 响应式数据优先用 `signals`（Angular 16+）或 `RxJS`
+
+---
+
+## Svelte / SvelteKit
+
+### 组件模板
+
+```svelte
+<script lang="ts">
+  import { onMount } from 'svelte'
+
+  interface Props {
+    title: string
+    onAction?: (id: number) => void
+  }
+
+  let { title, onAction }: Props = $props()
+
+  let loading = $state(false)
+  let data = $state<any[]>([])
+
+  onMount(async () => {
+    loading = true
+    try {
+      // TODO: 加载数据
+    } finally {
+      loading = false
+    }
+  })
+
+  function handleClick(id: number) {
+    onAction?.(id)
+  }
+</script>
+
+<div class="page-name">
+  <div class="header">
+    <h1 class="title">{title}</h1>
+  </div>
+</div>
+
+<style scoped>
+  .page-name {
+    min-height: 100vh;
+    background-color: #f5f5f5;
+  }
+
+  .header {
+    padding: 16px;
+  }
+
+  .title {
+    font-size: 18px;
+    font-weight: 600;
+  }
+</style>
+```
+
+**Svelte 注意事项：**
+- SvelteKit 页面放在 `src/routes/<name>/+page.svelte`
+- 组件放在 `src/lib/components/`
+- 使用 `$state`（Svelte 5+）或 `let`（Svelte 4）管理响应式状态
+- 样式默认 scoped，无需额外配置
+
+---
+
 ## 通用样式模板
 
 ### SCSS（Vue/Angular）
@@ -293,5 +410,6 @@ Page({
 | uni-app | `src/pages/<name>/index.vue` | `src/components/` | `<style scoped lang="scss">` |
 | 小程序 | `pages/<name>/` | `components/` | `.wxss` 文件 |
 | Angular | `src/app/<name>/` | `src/app/shared/components/` | `.scss` 文件 |
+| SvelteKit | `src/routes/<name>/+page.svelte` | `src/lib/components/` | `<style scoped>` |
 
 **优先读取项目现有结构来决定放置路径。** 如果项目中已有 `src/views/`，就用 `views`；已有 `src/pages/`，就用 `pages`。
