@@ -1,6 +1,14 @@
 # 常见失败模式和规避方法
 
+> v2.2 — 与 SKILL.md 数据权威优先级对齐。
+
 真实项目中设计稿转代码的高频失败案例，必须在生成代码前和自检时逐一核对。
+
+## 阅读约定（贯穿全文）
+
+1. **数值主源是 HTML+CSS Spec**（`lanhu_get_ai_analyze_design_result`）。下文「正确做法」中涉及尺寸 / 间距 / 颜色等数值时，**第一步永远是先在 Spec 中找对应 CSS 属性**；只有 Spec 缺该属性时，才走文中列出的 fallback 公式（layer_tree / sketch_annotations / 图像分析）。
+2. **图像分析 fallback 受限于 SKILL.md §0 白名单**：富文本分色、独立背景容器色值、缺端点的渐变、切图含/不含背景、Spec 内自相矛盾、坐标公式 fallback。其他场景不得用截图改 Spec 数值。
+3. 单位换算统一以「逻辑 375px / 物理 750px」为基准，详见 `SKILL.md §2.2`。
 
 ---
 
@@ -107,11 +115,11 @@ margin: var(--spacing-sm);
 
 **场景：** 设计稿使用 `px` 标注，但项目是移动端需要用 `rpx` 或 `rem`。
 
-**正确做法：**
-- uni-app：`1px ≈ 2rpx`（基于 375px 设计稿）
-- 小程序：同 uni-app 换算规则
-- H5 移动端：根据项目根字号配置换算，或使用 `postcss-pxtorem`
-- PC 端：直接使用 `px`
+**正确做法：** 以 `detect-tech-stack.sh` 输出的 `UNIT_STRATEGY` 为准（蓝湖移动端基准：**逻辑 375px / 物理 750px**）：
+- `rpx`（uni-app / 小程序 / Taro）：逻辑 px × 2
+- `rem`（H5 移动端 + 适配方案）：逻辑 px ÷ root font-size
+- `px`（PC Web）：1:1
+- 完整示例与公式见 `SKILL.md §2.2`，不在此处重复
 
 ---
 
@@ -131,7 +139,11 @@ margin: var(--spacing-sm);
 
 **识别信号：** 将生成的代码与设计稿逐区域比对，发现设计稿中有但代码中没有的元素。
 
-**正确做法：** 在步骤 2.3 元素分类中，逐元素从设计稿 layers/tokens 数据中提取所有可见元素。遗漏是最严重的还原度问题。
+**正确做法：**
+1. 生成期：边读 Spec 边按区域核对（`SKILL.md §2.1` 主路径），不要跳过 Spec 中 `display:none`/`visibility:hidden` 之外的任何节点
+2. 交付前：`SKILL.md §3.1 Fidelity Audit ⑨` 强制核对"Spec 中每个可见元素在代码中存在"
+3. 截图视觉核对（`SKILL.md §3.5`）作为兜底发现遗漏的最后一道关
+4. 遗漏是最严重的还原度问题，发现一处就必须回到 Spec 重核相邻区域是否同样遗漏
 
 ---
 
@@ -170,10 +182,13 @@ margin: var(--spacing-sm);
 **识别信号：** 页面上内容卡片与 hero 区域之间有明显空白间隔，而设计稿中卡片紧贴甚至重叠 hero 底部。
 
 **正确做法：**
-1. 从设计稿 layer tree 或 sketch_annotations 找到内容区起始 Y 坐标（如 `col @0,230` 表示 y=230 逻辑像素）
-2. 计算：`负margin = 内容起始Y × 2（转rpx） - hero高度`
-3. 例：内容 y=230 → 460rpx，hero=750rpx → margin-top: -290rpx
-4. **绝对不能凭感觉写一个 -60rpx 或 -100rpx**
+1. **优先**：在 HTML Spec 中查找该容器的 `margin-top` / `transform: translateY(...)` / `position: absolute; top: ...`。多数情况下 Spec 已直接给出重叠表达
+2. **Spec 缺该属性时 fallback**（属于 §0 白名单 ⑥）：
+   - 从 layer_tree 或 sketch_annotations 找到内容区起始 Y 坐标（如 `col @0,230` 表示 y=230 逻辑像素）
+   - 计算：`负margin = 内容起始Y × 2（转rpx） - hero高度`
+   - 例：内容 y=230 → 460rpx，hero=750rpx → margin-top: -290rpx
+3. **绝对不能凭感觉写一个 -60rpx 或 -100rpx**
+4. 走 fallback 时必须在缓存「图像分析 fallback 来源标注」段写明
 
 ---
 
@@ -197,9 +212,9 @@ margin: var(--spacing-sm);
 **识别信号：** 某些卡片内容看起来偏左或偏右，与设计稿不对齐。
 
 **正确做法：**
-1. 从 layer tree 提取每张卡片的外框宽度和内部内容宽度
-2. 分别计算 padding = (外框宽 - 内容宽) / 2
-3. 不同卡片可能有不同 padding，必须逐一计算，不能用统一值
+1. **优先**：HTML Spec 中通常每个卡片选择器都会独立给出 `padding` 值，**逐选择器复制**，不要把多个卡片合并为同一 class
+2. **Spec 缺 padding 时 fallback**（属于 §0 白名单 ⑥）：从 layer_tree 提取每张卡片的外框宽度和内部内容宽度，分别计算 `padding = (外框宽 - 内容宽) / 2`
+3. 不同卡片可能有不同 padding，必须逐一处理，不能用统一值
 
 ---
 
@@ -210,11 +225,12 @@ margin: var(--spacing-sm);
 **识别信号：** 代码中的尺寸值看起来"差不多"但设计稿上明显偏大或偏小。
 
 **正确做法：**
-1. 所有尺寸必须从 sketch_annotations 或 layer tree 中提取精确值
-2. **sketch_annotations 的值是逻辑像素，× 2 才是 rpx**
-3. **layer tree 的值是 @2x 像素，直接等于 rpx**（在 750rpx 基准下）
-4. 切图的 size 字段就是显示尺寸（rpx），不要自行缩放
-5. 切片如已包含背景（如步骤图标含圆形背景），不要再加额外的背景层
+1. **优先**：HTML Spec 中通常已给出 `width / height / font-size` 等显式尺寸，直接复制后按 `UNIT_STRATEGY` 换算
+2. **Spec 缺尺寸时 fallback**（属于 §0 白名单 ⑥）：
+   - sketch_annotations 的值是**逻辑 px**，按 `UNIT_STRATEGY` 公式换算（rpx 时 × 2）
+   - layer_tree 的值是**物理 px（@2x）**，在 rpx 策略下直接等于 rpx 数值
+   - 切图 `slices.size` 是显示尺寸（rpx），不自行缩放
+3. 切片如已包含背景（如步骤图标含圆形背景），不再加额外背景层（见失败 24）
 
 ---
 
@@ -225,10 +241,12 @@ margin: var(--spacing-sm);
 **识别信号：** 多个相邻元素的间距与设计稿明显不符（过大或过小）。
 
 **正确做法：**
-1. 从 sketch_annotations 取两个相邻元素的绝对 Y 坐标
-2. 间距 = 下一个元素 top - 上一个元素 top - 上一个元素 height
-3. 例：标题 top=197rpx height=104rpx，subtitle top=310rpx → 间距 = 310-197-104 = 9rpx
-4. 用绝对坐标差值计算，不要靠感觉
+1. **优先**：HTML Spec 中流式区域通常已给 `gap` / `margin-top` / `padding-top`，直接复制
+2. **Spec 缺间距时 fallback**（属于 §0 白名单 ⑥）：
+   - 从 sketch_annotations 取两个相邻元素的绝对 Y 坐标
+   - `间距 = 下一个元素 top - 上一个元素 top - 上一个元素 height`
+   - 例：标题 top=197rpx height=104rpx，subtitle top=310rpx → 间距 = 310-197-104 = 9rpx
+3. 用绝对坐标差值计算，不要靠感觉
 
 ---
 
@@ -238,14 +256,15 @@ margin: var(--spacing-sm);
 
 **识别信号：** 生成的代码中，某段文字的 `color` 值与其父容器（或祖先容器）的 `background-color` 相同或极度接近。
 
-**根因：** 蓝湖标注以 textLayer 为粒度，只记录文字本身的颜色。但文字可能拥有独立背景容器（如渐变 pill、圆角 badge），这个背景容器的信息在 layer tree 中是文字的兄弟节点，容易被忽略。
+**根因：** Spec 以 textLayer 为粒度记录文字颜色，但文字的**独立背景容器**（pill / badge / 渐变块）常是兄弟节点，HTML Spec 也可能没把它表达为该 text 的父容器。属于 SKILL.md §0 白名单 ②。
 
-**正确做法：**
-1. 对每个文字元素，对比其 `color` 与父容器 `background-color`
-2. 如果两者相同或极度接近（对比度不足），**立即标记为 `⚠ 可见性问题`**
-3. 检查 layer tree 中该文字元素的兄弟节点 —— 是否存在背景 shape（如 `Rectangle`、`Ellipse`、带 `fill` 的 shapeLayer）
-4. 如有背景 shape → 文字需要包裹在一个带背景的容器中（如渐变 pill、圆角 badge）
-5. 如无背景 shape → 文字颜色可能有误，用图像分析工具从截图中重新提取
+**正确做法（白名单 ②，允许图像分析）：**
+1. 对每个文字元素，对比其 `color` 与最近祖先的 `background-color`
+2. 相同或极度接近（对比度不足）→ **立即标记 `⚠ 可见性问题`**
+3. 检查 layer tree 中该文字元素的兄弟节点 —— 是否存在背景 shape（`Rectangle`、`Ellipse`、带 `fill` 的 shapeLayer）
+4. **有兄弟 shape**：把 shape 的 `width / height / border-radius / fill` 提取出来，让文字包裹在带该背景的容器中（pill / badge）；优先从 HTML Spec 找该 shape 的 CSS，找不到再图像分析其色值
+5. **无兄弟 shape**：文字颜色可能记录错误，按 §0 白名单 ② 用图像分析重新提取颜色
+6. 在缓存「图像分析 fallback 来源标注」段写明本次提取来源
 
 **自检方法：** 在代码中搜索所有 `color: #FFFFFF` 或 `color: white` 的文字，逐一确认其父容器背景色不是白色。
 
@@ -255,19 +274,22 @@ margin: var(--spacing-sm);
 
 **场景：** 项目中已有页面 `activity/index.vue` 的卡片圆角是 `border-radius: 16rpx`。生成新页面时，直接复制了这个值。但当前设计稿的卡片圆角实际是 `32rpx`。类似问题也常见于 padding、icon 尺寸、间距等值。
 
-**识别信号：** 生成的代码中，CSS 值与已有页面完全一致，但与当前设计稿的 tokens/annotations/截图不匹配。
+**识别信号：** 生成的代码中，CSS 值与已有页面完全一致，但与当前设计稿的 Spec/tokens/annotations 不匹配。
 
 **根因：** 技能的"项目上下文收集"步骤鼓励参考已有代码。但参考的是**代码结构/风格**（如组件组织方式、命名规范），不是**具体数值**。具体 CSS 值（圆角、间距、尺寸）因设计稿而异，不能跨页复制。
 
 **正确做法：**
 1. 从已有页面参考的是：代码风格、组件结构、命名规范、技术栈用法
 2. 具体 CSS 值（border-radius、padding、gap、icon size 等）**必须从当前设计稿数据中提取**
-3. 当 tokens/annotations 中缺失某个值时：
-   - **优先**：用图像分析工具从当前设计稿截图中提取
+3. 数据查找顺序：
+   - **优先**：当前设计稿的 HTML Spec
+   - **其次**：Design Tokens
+   - **fallback**：layer_tree / sketch_annotations（§0 白名单 ⑥）
+   - **最后**：图像分析（仅 §0 白名单场景）
    - **禁止**：从项目其他页面的代码中推断
-4. 建立验证习惯：复用已有值前，先问"当前设计稿有明确的不同值吗？"
+4. 建立验证习惯：复用已有值前，先问"当前 Spec 有明确的不同值吗？"
 
-**自检方法：** 对比生成的 CSS 中被直接复用的值，与当前设计稿的 tokens/annotations 是否一致。
+**自检方法：** 对比生成的 CSS 中被直接复用的值，与当前设计稿的 Spec/tokens/annotations 是否一致。
 
 ---
 
@@ -280,13 +302,14 @@ margin: var(--spacing-sm);
 - 包含状态词（"已完成"、"进行中"、"未核销"）
 - 标题中包含冒号分隔的关键信息（"人数：X"）
 
-**根因：** 蓝湖/Figma 标注以 textLayer 为粒度输出，一个 textLayer 只有一个颜色值。但实际设计中经常出现同一行文字内部部分字符颜色不同（富文本），这些信息在数据层面丢失了。
+**根因：** 蓝湖/Figma 标注以 textLayer 为粒度输出，一个 textLayer 只有一个颜色值。但实际设计中经常出现同一行文字内部部分字符颜色不同（富文本），这些信息在数据层面丢失了。属于 SKILL.md §0 白名单 ①。
 
-**正确做法：**
-1. **触发条件**：当文本内容包含数字、状态词、或冒号后的关键信息时
-2. **验证方法**：用图像分析工具对设计稿截图中该文字区域进行逐字颜色分析
-3. **实现方式**：将文本拆分为多个 `<text>` 元素，分别设置颜色
-4. **典型模式**：
+**正确做法（白名单 ①，允许图像分析）：**
+1. **触发条件**：文本内容包含数字、状态词、或冒号后的关键信息
+2. **先看 HTML Spec**：少数情况下 Spec 已把富文本拆分为多个 `<span>` 并分别给色，此时直接迁移即可
+3. **Spec 仅单色时**：用图像分析工具对设计稿截图中该文字区域进行逐字颜色分析
+4. **实现方式**：将文本拆分为多个 `<text>` / `<span>` 元素，分别设置颜色
+5. **典型模式**：
    ```
    <!-- 错误：整体一个颜色 -->
    <text class="title">注册并首单核销人数：3人</text>
@@ -297,8 +320,9 @@ margin: var(--spacing-sm);
      <text class="highlight">3人</text>
    </view>
    ```
+6. 缓存「图像分析 fallback 来源标注」段写明该次拆分
 
-**自检方法：** 扫描所有文本内容，含数字的标题/标签一律用图像分析工具核对逐字颜色。
+**自检方法：** 扫描所有文本内容，含数字的标题/标签一律对照截图核对逐字颜色。
 
 ---
 

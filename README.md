@@ -17,31 +17,30 @@
 用户输入（蓝湖 URL / 设计图）
         │
         ▼
-[1] 输入判断 + 技术栈检测 + 意图判断（并行）
+[1] 技术栈检测（含 UNIT_STRATEGY）+ 蓝湖 MCP 三步 + 下载切图 + 项目上下文 → 任务启动 ACK
+        │  (等用户在 ACK 确认设计图选哪张、UNIT_STRATEGY、改造范围)
+        ▼
+[2] 以 HTML+CSS Spec 迁移到目标框架（数值原样，结构适配）+ §0 白名单内允许图像分析 fallback
         │
         ▼
-[2] 获取设计数据 + 下载切图 + 视觉校验
-        │
-        ▼
-[3] 设计分析（页面属性 + 元素分类 + CSS 值 + 四项强制校验）
-        │                                          ↕
-[4] 项目上下文 + 组件映射（与步骤 3 并行）
-        │
-        ▼
-[5] 生成代码 + 自检
+[3] Fidelity Audit + 四项校验 + pitfalls + 编译（可选视觉核对遗漏）
 ```
 
 ### 核心机制
 
 | 机制 | 说明 |
 |------|------|
-| **四项强制校验** | 可见性校验 → 跨页面复制验证 → 富文本检测 → 切图内容分析，任何一项失败都需修正后再继续 |
-| **数据驱动** | 所有尺寸/间距/颜色从蓝湖设计数据反推，不靠猜测 |
-| **先看图再对数据** | 拿到设计稿后先看完整截图建立视觉认知，再对照 Design Tokens 核实背景色/渐变等细节，避免遗漏 |
-| **元素精准分类** | 区分 DOM 节点（代码实现）和切图资源（图片实现），避免该用图片的地方用代码、该用代码的地方用图片 |
-| **所见即所出** | 设计稿中的元素必须全部还原，不存在的元素绝不添加 |
-| **24 个失败模式** | 从真实项目中总结的常见错误及规避方法，自检时逐一核对 |
-| **智能确认节奏** | 默认连续执行，仅在复杂场景（>30 元素、多冲突、改造模式）时暂停等待用户确认 |
+| **HTML+CSS Spec 主源** | `lanhu_get_ai_analyze_design_result` 返回的 CSS 为数值主源，Tokens/layer 仅补充缺项 |
+| **§0 图像分析白名单** | 富文本分色 / 独立背景容器 / 缺端点的渐变 / 切图含背景判定 / Spec 矛盾 / 坐标 fallback 才允许图像分析 |
+| **任务启动 ACK** | 数据准备完成后强制输出确认清单，用户在生成代码前介入岔路口 |
+| **Fidelity Audit** | 10 项固定 schema，逐项对照 Spec，失败必须修复 |
+| **四项强制校验** | 可见性 → 跨页复制 → 富文本 → 切图背景，交付前必做 |
+| **UNIT_STRATEGY** | 自动检测 rpx / rem / px；移动 UI 库无适配方案时输出警告 |
+| **元素精准分类** | DOM 与切图分工明确，本地资源、不用 CDN |
+| **所见即所出** | 设计稿元素全还原，不添加 Spec 外内容 |
+| **24 个失败模式** | `references/pitfalls.md` 生成前扫信号、交付前逐条核对 |
+| **改造先确认** | 改造现有页时按固定 schema 列变更清单，用户确认后再改 |
+| **缓存有效性规则** | 第二轮修正按 design_name / 时间 / 用户指示决定是否重新 analyze |
 
 ## 安装
 
@@ -208,46 +207,22 @@ python lanhu_mcp_server.py
 
 > 如果不配置蓝湖 MCP，仍然可以通过设计图图片方式使用本 skill，但精度会降低（视觉分析 vs 精确设计数据）。
 
+**MCP 调用顺序：** `lanhu_get_designs` → `lanhu_get_ai_analyze_design_result` → `lanhu_get_design_slices`（每张设计图各调一次 slices）。
+
 ## 工作流程示例
 
 ```
 你：帮我还原这个蓝湖设计稿 https://lanhuapp.com/web/#/item/project/...
 
 Claude Code：
-[1/5] 输入判断 + 技术栈检测 + 意图判断
-      → 蓝湖 URL ✓  检测到 Vue3 + Element Plus + SCSS  → 新建页面
-
-[2/5] 获取设计数据 + 视觉校验
-      → 蓝湖页面分析完成，切图下载完成
-      → 截图核对 tokens：发现 hero 渐变 tokens 遗漏，已从截图补充
-
-[3/5] 设计分析（页面属性 → 元素分类 → CSS 值 → 四项校验）
-
-      页面属性：背景色 #F5F5F5, 750rpx 基准
-
-      元素勾选清单（23 个元素，DOM×15 + 切图×8）：
-      - [ ] 背景装饰图 (750×400) → 切图-背景 | hero_bg.png
-      - [ ] "邀好友得奖励" → DOM 文字 | 80rpx, #FFFFFF, Bold
-      - [ ] 副标题背景条 → DOM 形状 | #FFEDD8, 圆角12rpx
-      ...
-
-      ⚠ CSS 冲突速查表（3 条冲突，需确认）：
-      | 选择器 | 属性 | tokens 值 | 实际值 |
-      | .card-badge | background | #FFFFFF | linear-gradient(...) |
-
-      四项校验：可见性 ✓  跨页复制 ✓  富文本 ✓  切图尺寸 ✓
-
-[4/5] 项目上下文 + 组件映射
-      → 组件文档 ✓ 设计 token ✓ 编码规范 ✓
-      → 复用 5 个组件，新增 2 个组件
-
-[5/5] 生成代码 + 自检
-
-      ✓ 生成文件：src/pages/invite/index.vue
-      ✓ 复用组件：NavBar, CouponCard, StepProgress
-      ⚠ 新增组件：RewardCard, InviteRuleDialog（需 review）
-      ⚠ 未映射 token：#FFEDD8
-      ⚠ TODO 项：API 接口路径需确认
+[1] 技术栈检测 → Vue3 + Element Plus + UNIT_STRATEGY: px
+[2] lanhu_get_designs → 用户确认设计图名称
+    lanhu_get_ai_analyze_design_result → 获取 HTML+CSS Spec
+    lanhu_get_design_slices + 下载本地 assets
+[3] 按 Spec 生成 Vue SFC，Token 完全匹配处映射 var(--primary)
+[4] Fidelity Audit 10 项通过 + 四项校验 + npm run build
+      ✓ src/pages/invite/index.vue
+      ⚠ 未映射 token: #FFEDD8
 ```
 
 ## 常见问题
@@ -262,11 +237,16 @@ Claude Code：
 
 ### 生成的代码质量如何保证？
 
-Skill 内置了 4 项强制校验和 13 项自检清单，确保：
-- 所有 CSS 值与设计稿一致（四项校验逐一核对）
-- 所有可见元素都已还原（元素勾选清单）
-- 使用项目已有的组件和设计 token
-- 代码完整不省略
+Skill 内置了三重防线：
+
+- **10 项 Fidelity Audit**（逐项对照 HTML Spec）
+- **4 项强制校验**（可见性 / 跨页复制 / 富文本 / 切图背景）
+- **24 个常见失败模式**自检清单（`references/pitfalls.md`）
+
+加上：
+- 任务启动 ACK 让用户在生成前确认岔路口（设计图选哪张、改造范围、UNIT_STRATEGY）
+- Spec 局限场景的图像分析 fallback 受白名单约束，越界一律标注
+- 使用项目已有的组件和设计 token，代码完整不省略
 
 ## 贡献
 

@@ -11,7 +11,6 @@
 ```vue
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import type { PropType } from 'vue'
 
 // Props 定义
 interface Props {
@@ -320,7 +319,8 @@ export class ComponentNameComponent implements OnInit {
   </div>
 </div>
 
-<style scoped>
+<style>
+  /* Svelte 的 <style> 默认 scoped，无需额外属性 */
   .page-name {
     min-height: 100vh;
     background-color: #f5f5f5;

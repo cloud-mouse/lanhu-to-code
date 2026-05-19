@@ -1,5 +1,20 @@
 # CSS 值提取与数据驱动尺寸计算
 
+> v2.2 — 与 SKILL.md 数据权威优先级 + §0 白名单对齐。
+
+## 数据权威优先级
+
+| 优先级 | 来源 | 用途 |
+|--------|------|------|
+| 1 | `lanhu_get_ai_analyze_design_result` 返回的 **HTML+CSS** | 所有 CSS 属性值的主源 |
+| 2 | Design Tokens（analyze 附带） | 仅当 HTML **缺少**某属性时补充（渐变、阴影等） |
+| 3 | layer_tree / sketch_annotations | 仅当 HTML 与 Tokens 均缺项时的 fallback（坐标公式） |
+| 4 | 设计截图 + 图像分析 | 仅 `SKILL.md §0` 白名单场景；其他情形仅核对元素是否遗漏，**不改 Spec 数值** |
+
+生成代码时：**先复制 Spec 中的 CSS，再按 `UNIT_STRATEGY` 做单位换算。**
+
+---
+
 ## 子元素粒度颜色提取
 
 **颜色提取必须按最小可见单元逐一提取，而非按区域整体。**
@@ -9,172 +24,132 @@
 | .coupon-card | 主色 | #946B41 | ← 整个卡片只取了一个颜色
 ```
 
-正确示范：
+正确示范（从 Spec 中逐选择器摘录）：
 ```
-| .coupon-card-bg | background | #FFF4E6 | 卡片背景 |
-| .coupon-value | color | #D80D29 | ← 金额是红色，不是金色 |
-| .coupon-symbol | color | #D80D29 | ¥ 符号同色 |
-| .coupon-name | color | #946B41 | 名称是金色 |
-| .coupon-btn-bg | background | linear-gradient(135deg, #F54E25, #D80D29) | 按钮渐变 |
-| .coupon-btn-text | color | #FFFFFF | 按钮文字白色 |
+| .coupon-card-bg | background | #FFF4E6 |
+| .coupon-value | color | #D80D29 |
+| .coupon-btn-bg | background | linear-gradient(135deg, #F54E25, #D80D29) |
 ```
-
-## 布局方向确认
-
-**对于每个含方向性的元素，必须明确标注其相对于父/兄弟元素的位置关系：**
-
-```
-| .milestone-label | position | 节点上方 | ← 不是下方 |
-| .milestone-status | position | label 下方 | ← 在节点区域内 |
-```
-
-**不能凭直觉判断上下左右，必须以设计稿坐标数据为准。**
-
-## 单位换算规则
-
-| 数据来源 | 单位 | 换算为 rpx（750 基准） |
-|---------|------|----------------------|
-| `sketch_annotations` | 逻辑像素 | × 2 |
-| `layer_tree` | @2x 像素 | 直接使用 |
-| `slices.size` | @2x 像素 | 直接使用 |
-| `HTML/CSS` (蓝湖输出) | 逻辑像素（已除以 @2x） | × 2 |
-
-## 布局策略决定计算深度
-
-**在计算前，先判断区域布局类型（参见 SKILL.md §2.2 流式/重叠判断）：**
-
-| 布局类型 | 间距获取方式 | padding 获取方式 |
-|---------|------------|----------------|
-| **流式布局** | 直接从标注读取，统一间距用 `gap`，不等间距用 `margin` | 从标注读取，先验证是否统一 |
-| **重叠布局** | 坐标差值反推（下方公式） | 逐一计算（下方公式） |
-
-以下坐标计算公式**仅在重叠布局区域**使用。流式布局区域直接从标注数据读取对应值即可。
 
 ---
 
-## 重叠布局区域：必须精确计算的值
+## 单位换算规则
+
+**基准（与 `SKILL.md §2.2` 一致）：逻辑 375px / 物理 750px。**
+
+以 `detect-tech-stack.sh` 输出的 `UNIT_STRATEGY` 为准：
+
+| UNIT_STRATEGY | HTML/CSS（逻辑 px） | layer_tree（物理 px / @2x） | sketch_annotations（逻辑 px） |
+|---------------|--------------------|------------------------------|------------------------------|
+| `rpx` | × 2 | 直接使用 | × 2 |
+| `rem` | ÷ root font-size | ÷ 2 ÷ root | ÷ root |
+| `px` | 1:1 | ÷ 2 | 1:1 |
+
+完整示例见 `SKILL.md §2.2`，本文档不重复。
+
+---
+
+## 何时使用 fallback 手算
+
+**默认不需要。** 仅当 HTML Spec 中缺少以下信息时，才用 layer/annotations 按本节公式计算：
+
+- 区域重叠负 margin（hero 与内容区交叉）
+- absolute 装饰元素偏移
+- HTML 未表达的 padding/gap（且 Tokens 也无）
+
+计算公式见下文「重叠布局 fallback」。
+
+**禁止**：在 HTML Spec 已给出完整 flex + margin/padding 的区域，再用坐标重算一遍。
+
+---
+
+## 布局方向确认
+
+对含方向性的元素，以 **HTML Spec 的 DOM 顺序与 CSS 定位** 为准；fallback 时才用坐标：
+
+```
+| .milestone-label | position | 节点上方 |
+| .milestone-status | position | label 下方 |
+```
+
+不能凭直觉判断上下左右。
+
+---
+
+## 重叠布局 fallback（仅 HTML 缺项时）
 
 ### a) 内容区与 hero 的重叠量
 
 ```
-负margin = 内容区起始Y(×2转rpx) - hero高度
+负 margin = 内容区起始Y(按 UNIT_STRATEGY 换算) - hero 高度
 ```
-例：内容 y=230 → 460rpx，hero=750rpx → margin-top: -290rpx
 
-### b) 每张卡片的内边距（逐一计算，不统一）
+### b) 卡片内边距
 
 ```
 padding = (卡片外框宽度 - 卡片内容宽度) / 2
 ```
-不同卡片内容宽度不同 → padding 不同
 
-### c) 相邻元素间距（从绝对坐标反推）
+### c) 相邻元素间距
 
 ```
-间距 = 下一个元素 top - 上一个元素 top - 上一个元素 height
+间距 = next.top - prev.top - prev.height
 ```
-不能用 margin-top 链式累加，必须从坐标差值计算
 
-### d) 元素尺寸（从 layer tree / sketch 提取，不猜）
+### d) 元素尺寸
 
-- 进度条高度、图标大小、分割线粗细、圆角缺口大小
-- 切图已含背景的（如步骤图标），不要再加额外背景层
+从 layer tree / slices 提取，不猜测。
 
 ---
 
-## 流式布局区域：快速读值指南
+## 流式区域（Spec 已给出 flex 时）
 
-**流式布局区域不需要坐标推算，直接从标注数据读取以下值即可：**
+直接从 HTML Spec 复制：
 
-| 需要的值 | 数据来源 | 读取方法 |
-|---------|---------|---------|
-| 容器宽度 | layer_tree | 括号内第一个数字，如 `(702x294)` → 702rpx |
-| 容器高度 | layer_tree | 括号内第二个数字，如 `(702x294)` → 294rpx |
-| 元素间距 | sketch_annotations | 同行/同列相邻元素的 top/left 差值，逻辑px × 2 |
-| padding | sketch_annotations | 外框位置减内容位置，逻辑px × 2 |
-| 字体大小 | sketch_annotations textLayer | `font-size` 字段，逻辑px × 2 |
-| 文字颜色 | sketch_annotations textLayer | `color` 字段，直接使用 |
-| 背景色 | sketch_annotations shapeLayer | `fill` 字段，直接使用 |
-| 圆角 | sketch_annotations shapeLayer | `border_radius` 字段，逻辑px × 2（如有） |
+- `display:flex` / `flex-direction` / `justify-content` / `align-items`
+- `gap` / `padding` / `margin`
+- 子元素宽高字号颜色
 
-**实现方式：** 用 flex 布局 + gap + padding 即可，不需要计算任何绝对坐标。
+**不要**再用 annotations 重算 gap。
 
 ---
 
 ## 可见性校验（防止白字白底）
 
-**颜色提取完成后，必须对每个文字元素执行可见性检查。**
+对每个文字元素：
 
-```
-检查规则：
-  对每个文字元素的 color 值：
-  1. 找到其父容器（或最近祖先）的 background-color
-  2. 如果 color ≈ background-color（相同或极度接近）→ 标记 ⚠ 可见性问题
-  3. 检查 layer tree 中该文字的兄弟节点是否有背景 shape
-  4. 有背景 shape → 文字需要包裹在带背景的容器中
-  5. 无背景 shape → 文字颜色可能有误，用图像分析重新提取
-```
-
-常见模式：
-- 白字 (#FFFFFF) 在白色卡片上 → 需要渐变 pill 或有色背景 badge
-- 浅灰字在浅灰背景上 → 可能是设计意图（如"未达成"），但也可能是误判
+1. 取 Spec 中的 `color`
+2. 找最近祖先的 `background`（或兄弟 shape 的背景）
+3. `color ≈ background` → `⚠ 可见性问题`，查是否需包裹 pill/badge
+4. 参考 layer 兄弟节点是否有背景 shape
 
 ---
 
 ## 富文本检测（防止部分变色丢失）
 
-**蓝湖标注以 textLayer 为粒度，一个 textLayer 只有一个颜色值。但设计中经常出现同一行文字内部部分变色。**
+当文案含 **数字、状态词、冒号关键信息**（如 `3人`、`已完成`、`人数：3`）：
 
-```
-检测规则：
-  当文本内容包含以下特征时，必须用图像分析逐字核对颜色：
-  1. 包含数字：如 "3人"、"80%"、"¥199"
-  2. 包含状态词：如 "已完成"、"进行中"、"未核销"
-  3. 包含冒号分隔的关键信息：如 "人数：3"、"进度：80%"
-```
-
-实现方式：将文本拆分为多个 `<text>` 元素，分别设置颜色。
+1. 查 HTML Spec 是否已拆分为多个节点/span
+2. 若 Spec 仅单色 → 对照设计截图拆分为多节点并分别设色
+3. 禁止整段使用单一 textLayer 颜色
 
 ---
 
-## 跨页面值复用验证（防止盲目复制）
+## 跨页面值复用验证
 
-**从项目已有页面复用 CSS 值时，必须与当前设计稿数据交叉验证。**
+| 可复用 | 必须按当前 Spec 验证 |
+|--------|---------------------|
+| 组件结构、命名、框架用法 | border-radius、padding、gap、字号、icon 尺寸 |
 
-```
-验证规则：
-  可以复用的（代码层面）：
-    ✓ 组件结构、命名规范、技术栈用法
-    ✓ CSS 变量/token 引用方式
-
-  必须验证的（数值层面）：
-    ✗ border-radius（不同设计稿的卡片圆角可能不同）
-    ✗ padding / gap（不同设计稿的间距可能不同）
-    ✗ icon 尺寸（不同切图的实际尺寸可能不同）
-    ✗ 字体大小（不同设计稿的字号体系可能不同）
-
-  验证方法：
-    1. 先查当前设计稿的 tokens/annotations
-    2. 有值 → 用当前设计稿的值
-    3. 无值 → 从当前设计稿截图中提取（禁止用其他页面的值推断）
-```
+验证：当前 Spec 有值 → 用 Spec；无值 → 查 Tokens；仍无 → 标注 TODO，**禁止**从其他页面抄数值。
 
 ---
 
-## 切图内容分析（防止尺寸不匹配）
-
-**下载切图后，必须判断切图是否包含背景，决定 CSS 写法。**
+## 切图内容分析
 
 ```
-判断方法（基于 slices 数据）：
-  artboard 类型切片 → 通常含背景 → 直接全尺寸展示
-  shapeLayer 类型切片 → 通常不含背景 → 需要 CSS 添加背景容器
-
-  例 A：步骤图标切片 (artboard, 80x80, 含 #FFF4E6 圆形背景)
-  → CSS: width: 80rpx; height: 80rpx; （不加额外背景）
-
-  例 B：图标切片 (shapeLayer, 40x40, 透明底)
-  → CSS: 外层 wrap 80rpx + background: #FFF4E6; 内层 icon 40rpx
+artboard 类切片 → 常含背景 → 直接设宽高，不加额外背景
+shapeLayer 类切片 → 常透明底 → 外层 wrap + 背景色 + 内层 icon 尺寸
 ```
 
-**关键：不同设计稿的切图内容可能不同，禁止参考其他页面的 icon 尺寸写法。**
+以当前 `lanhu_get_design_slices` 元数据为准，禁止照搬其他页面的 icon 写法。
