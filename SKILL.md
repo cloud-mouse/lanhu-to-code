@@ -131,9 +131,26 @@ bash scripts/detect-tech-stack.sh [项目根目录]
 | 给出精确设计图名称 | 该名称 |
 | 给出序号「第 6 张」 | 使用 `lanhu_get_designs` 返回的 `index`，非名称前缀 |
 | 仅项目 URL、未指定图 | **禁止自动选第一张**；列出列表请用户选择 |
-| 要求全部页面 | `'all'`（注意上下文与耗时，复杂项目可分批） |
+| 用户要求"全部页面" | **禁止直接传 `'all'`**；按下文「批处理规则」分批传具体名称数组 |
 
-**`compact` 参数**：单页 HTML 很大、导致上下文紧张时，可对 `lanhu_get_ai_analyze_design_result` 设 `compact: true`，再从返回的文件路径读取 HTML。
+**`compact` 参数（默认 `true`，强制开启以省上下文）：**
+
+| 场景 | `compact` | 说明 |
+|------|-----------|------|
+| 默认 / 任何不确定情况 | `true` | HTML 不内联在 response，保存到文件路径；用 Read 工具按需读 |
+| 极简单页（用户**明确告知**元素 <20、设计图 1 张） | `false` | 允许内联，省一次文件读 |
+
+`compact: true` 时：
+1. analyze 返回的文本含 `local_html_path: <path>` 字段，用 Read 读取该文件得到完整 HTML+CSS
+2. 大设计稿（>30KB HTML）走 compact 可节省 50–80% 的上下文 token
+3. 缓存只摘录"关键 CSS"段，**不要把整段 HTML 写进缓存**
+
+**批处理规则（多 design / `'all'` 场景，强制）：**
+
+- 一次 `lanhu_get_ai_analyze_design_result` 调用的 `design_names` 数组**长度 ≤ 3**
+- 多于 3 张时拆批：**每批 ≤3 张 design 完成一个完整循环**（analyze → 写代码 → §3.1 Audit → 缓存）后再开下一批
+- 跨批之间复用：技术栈检测、Token 文件、项目上下文只读一次
+- `'all'` 字面值仅在 N≤3 张时使用；否则改为显式名称数组并分批
 
 **与 MCP 工具描述一致**：② 返回的 HTML+CSS 中，所有 CSS 属性值必须原样作为生成依据；附带的 `local_path ← remote_url` 映射表用于下载资源。
 
@@ -154,6 +171,8 @@ A. detect-tech-stack.sh → FRAMEWORK / UNIT_STRATEGY / TOKEN_FILE
 B. 蓝湖 MCP ① → ② → ③（②③ 可按 design 并行，但 ① 必须先完成）
 C. 项目上下文：src/components/、token 文件、路由、改造模式下的目标文件
 ```
+
+**多 design 时**：B 内的 ②③ 按 §1.4 批处理规则切片，每批 ≤3 张 design；A、C 跨批复用，不重复执行。
 
 ### 1.6 下载切图与静态资源
 
@@ -385,10 +404,11 @@ HTML Spec: padding: 12px 16px; font-size: 14px; color: #333;
 
 ### 3.6 定点修正（第二轮）
 
-1. 从缓存或重新调用 `lanhu_get_ai_analyze_design_result`（仅问题区域相关 design）
+1. 优先读 §2.6 缓存的「关键 CSS」段；缓存不足或失效（按 §2.6 缓存有效性规则）才重新调用 `lanhu_get_ai_analyze_design_result`，且仍按 §1.4 `compact: true` 默认，仅 analyze 问题区域相关 design
 2. 只改问题区域 CSS/结构
-3. 重做 §3.1–3.3
-4. 编译验证
+3. **局部 Audit**：仅对修改过的区域跑 §3.1 Audit 表（其他区域跳过）；§3.2 四项校验也只覆盖受影响项
+4. **不重读 pitfalls 全文**；仅当用户反馈中触发了新失败信号时，按 `references/pitfalls.md` 目录定位单条失败的「正确做法」段
+5. 编译验证
 
 ---
 
@@ -421,15 +441,22 @@ HTML Spec: padding: 12px 16px; font-size: 14px; color: #333;
 
 按阶段控制，避免无意义重复调用。**计数规则：同一阶段并行发起的 N 个工具调用算 1 批**（不论 N=2 还是 N=20）。
 
-| 阶段 | 建议批次 | 内容 |
-|------|---------|------|
-| 数据准备 | 1–2 批 | detect + designs + analyze + slices×N + 下载×M + 上下文 |
-| 生成 | 1 批 | 写代码 + 缓存 |
-| 验证 | 1 批 | Audit 输出 + build |
+| 阶段 | 建议批次（单批 ≤3 design） | 内容 |
+|------|--------------------------|------|
+| 数据准备 | 1–2 批 | detect + designs + analyze(compact) + slices×N + 下载×M + 上下文 |
+| 生成 | 1 批 / 批 | 写代码 + 缓存（只存关键 CSS 摘录，不存 HTML 全文） |
+| 验证 | 1 批 / 批 | Audit 输出 + build（最后一批做完再 build） |
 
 - **简单页**（单 design、<30 元素）：总计约 3 批
-- **复杂页**（多 design、大量切图、改造模式）：可增至 5 批，**不得**为省批次跳过下载或 Audit
+- **多 design 复杂项目**：按 §1.4 批处理规则，每批 ≤3 张 design 完整循环（analyze → 写代码 → Audit），跨批不堆积 HTML 上下文
+- **不得**为省批次跳过下载或 Audit
 - 同一 design 的 slices 与下载可与 analyze 并行（前提：analyze 已先完成）
+
+**上下文卫生：**
+
+- `lanhu_get_ai_analyze_design_result` 默认 `compact: true`，HTML+CSS 走文件而非内联
+- 第二轮修正（§3.6）优先读缓存关键 CSS，不重读 pitfalls 全文，除非用户反馈触发了新失败信号
+- ACK / Audit / 缓存模板里"无内容"行允许省略
 
 ### 参考文件按需读取
 
