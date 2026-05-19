@@ -160,6 +160,7 @@ lanhu-to-code/
 │   ├── css-value-extraction.md           # CSS 值提取与数据驱动尺寸计算
 │   ├── image-input-guide.md              # 图片输入降级策略
 │   ├── framework-patterns.md             # 各框架代码模板
+│   ├── layout-patterns.md                # 常见移动端布局模式速查
 │   └── pitfalls.md                       # 24 个常见失败模式
 ├── install.js                            # 安装脚本
 ├── package.json

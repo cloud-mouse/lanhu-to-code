@@ -76,10 +76,20 @@ if [ -f "$PROJECT_ROOT/package.json" ]; then
   " 2>/dev/null)
 fi
 
-# 将 PKG_INFO 导入为环境变量
+# 将 PKG_INFO 导入为变量（安全：拒绝任何非法 key，仅接受 [A-Z_][A-Z0-9_]* 且 value ∈ {0,1,数字字符串}）
 if [ -n "$PKG_INFO" ]; then
   while IFS='=' read -r key value; do
-    [ -n "$key" ] && eval "$key=\"$value\""
+    [ -z "$key" ] && continue
+    # 仅允许大写下划线开头的标识符（与本脚本上方 node 块输出的 key 一致）
+    if [[ ! "$key" =~ ^[A-Z_][A-Z0-9_]*$ ]]; then
+      continue
+    fi
+    # 仅允许数字（0/1/版本主号）作为 value
+    if [[ ! "$value" =~ ^[0-9]*$ ]]; then
+      continue
+    fi
+    # 用 printf -v 间接赋值，避免 eval
+    printf -v "$key" '%s' "$value"
   done <<< "$PKG_INFO"
 fi
 
