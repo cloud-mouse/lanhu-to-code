@@ -1,14 +1,15 @@
 # 常见失败模式和规避方法
 
-> v2.2 — 与 SKILL.md 数据权威优先级对齐。
+> v3.0 — 与 SKILL.md 数据权威优先级和图像 fallback 白名单对齐。
 
 真实项目中设计稿转代码的高频失败案例，必须在生成代码前和自检时逐一核对。
 
 ## 阅读约定（贯穿全文）
 
 1. **数值主源是 HTML+CSS Spec**（`lanhu_get_ai_analyze_design_result`）。下文「正确做法」中涉及尺寸 / 间距 / 颜色等数值时，**第一步永远是先在 Spec 中找对应 CSS 属性**；只有 Spec 缺该属性时，才走文中列出的 fallback 公式（layer_tree / sketch_annotations / 图像分析）。
-2. **图像分析 fallback 受限于 SKILL.md §0 白名单**：富文本分色、独立背景容器色值、缺端点的渐变、切图含/不含背景、Spec 内自相矛盾、坐标公式 fallback。其他场景不得用截图改 Spec 数值。
-3. 单位换算统一以「逻辑 375px / 物理 750px」为基准，详见 `SKILL.md §2.2`。
+2. **图像分析 fallback 受限于 SKILL.md 的白名单**：富文本分色、独立背景容器色值、缺端点的渐变、切图含/不含背景、Spec 内自相矛盾、坐标公式 fallback。其他场景不得用截图改 Spec 数值。
+3. 单位换算统一以「逻辑 375px / 物理 750px」为基准，详见 `SKILL.md §1.2`。
+4. **控上下文**：可先读 `references/pitfalls-signals.md` 定位可能命中的失败编号，再按需展开本文对应「失败 N」；交付前 24 项仍须逐项核对（见 `SKILL.md §4.3`）。
 
 ---
 
@@ -119,7 +120,7 @@ margin: var(--spacing-sm);
 - `rpx`（uni-app / 小程序 / Taro）：逻辑 px × 2
 - `rem`（H5 移动端 + 适配方案）：逻辑 px ÷ root font-size
 - `px`（PC Web）：1:1
-- 完整示例与公式见 `SKILL.md §2.2`，不在此处重复
+- 完整示例与公式见 `SKILL.md §1.2`，不在此处重复
 
 ---
 
@@ -140,9 +141,9 @@ margin: var(--spacing-sm);
 **识别信号：** 将生成的代码与设计稿逐区域比对，发现设计稿中有但代码中没有的元素。
 
 **正确做法：**
-1. 生成期：边读 Spec 边按区域核对（`SKILL.md §2.1` 主路径），不要跳过 Spec 中 `display:none`/`visibility:hidden` 之外的任何节点
-2. 交付前：`SKILL.md §3.1 Fidelity Audit ⑨` 强制核对"Spec 中每个可见元素在代码中存在"
-3. 截图视觉核对（`SKILL.md §3.5`）作为兜底发现遗漏的最后一道关
+1. 第 3 步生成期：边读 Spec 边按区域构建 DOM，并对照第 2 步「元素勾选清单」（`SKILL.md §2.2`）逐项落实，不要跳过 Spec 中 `display:none`/`visibility:hidden` 之外的任何节点
+2. 交付前：`SKILL.md §4.1` Fidelity Audit 表中「可见元素无遗漏/无新增」必须打勾
+3. 可选：`SKILL.md §4.4` 本地渲染截图与设计图并排核对，作为发现遗漏的兜底
 4. 遗漏是最严重的还原度问题，发现一处就必须回到 Spec 重核相邻区域是否同样遗漏
 
 ---
@@ -151,7 +152,7 @@ margin: var(--spacing-sm);
 
 **场景：** 设计稿页面有明显的背景色（如渐变或特定色值），但生成的代码页面背景是默认白色。
 
-**正确做法：** 在步骤 2.1 页面全局属性中，首先提取画布最底层的背景色/渐变，确保页面容器设置了正确的 background 属性。背景图加载期间应有背景色兜底。
+**正确做法：** 按 `SKILL.md` 第 3 步 `§3.1` / `§3.2`，在页面容器上首先设置画布最底层背景色/渐变；并在第 2 步 `§2.3` CSS 对照表中显式列出页面 `background`。背景图加载期间应有背景色兜底。
 
 ---
 
@@ -161,7 +162,7 @@ margin: var(--spacing-sm);
 
 **识别信号：** 同一区域内多个子元素的颜色被统一为一个值。
 
-**正确做法：** 在步骤 2 代码生成中，颜色必须按**最小可见单元**逐一提取。每个 `<text>`、`<view>` 等元素如果颜色不同，必须分别列出，不能取区域主色作为统一值。
+**正确做法：** 在第 3 步生成代码时（`SKILL.md §3.1`），颜色必须按**最小可见单元**逐一提取；第 2 步 `§2.3` 对照表须逐选择器列出。每个 `<text>`、`<view>` 等元素如果颜色不同，必须分别列出，不能取区域主色作为统一值。
 
 ---
 
@@ -183,7 +184,7 @@ margin: var(--spacing-sm);
 
 **正确做法：**
 1. **优先**：在 HTML Spec 中查找该容器的 `margin-top` / `transform: translateY(...)` / `position: absolute; top: ...`。多数情况下 Spec 已直接给出重叠表达
-2. **Spec 缺该属性时 fallback**（属于 §0 白名单 ⑥）：
+2. **Spec 缺该属性时 fallback**（属于图像/公式 fallback 白名单）：
    - 从 layer_tree 或 sketch_annotations 找到内容区起始 Y 坐标（如 `col @0,230` 表示 y=230 逻辑像素）
    - 计算：`负margin = 内容起始Y × 2（转rpx） - hero高度`
    - 例：内容 y=230 → 460rpx，hero=750rpx → margin-top: -290rpx
@@ -213,7 +214,7 @@ margin: var(--spacing-sm);
 
 **正确做法：**
 1. **优先**：HTML Spec 中通常每个卡片选择器都会独立给出 `padding` 值，**逐选择器复制**，不要把多个卡片合并为同一 class
-2. **Spec 缺 padding 时 fallback**（属于 §0 白名单 ⑥）：从 layer_tree 提取每张卡片的外框宽度和内部内容宽度，分别计算 `padding = (外框宽 - 内容宽) / 2`
+2. **Spec 缺 padding 时 fallback**（属于图像/公式 fallback 白名单）：从 layer_tree 提取每张卡片的外框宽度和内部内容宽度，分别计算 `padding = (外框宽 - 内容宽) / 2`
 3. 不同卡片可能有不同 padding，必须逐一处理，不能用统一值
 
 ---
@@ -226,7 +227,7 @@ margin: var(--spacing-sm);
 
 **正确做法：**
 1. **优先**：HTML Spec 中通常已给出 `width / height / font-size` 等显式尺寸，直接复制后按 `UNIT_STRATEGY` 换算
-2. **Spec 缺尺寸时 fallback**（属于 §0 白名单 ⑥）：
+2. **Spec 缺尺寸时 fallback**（属于图像/公式 fallback 白名单）：
    - sketch_annotations 的值是**逻辑 px**，按 `UNIT_STRATEGY` 公式换算（rpx 时 × 2）
    - layer_tree 的值是**物理 px（@2x）**，在 rpx 策略下直接等于 rpx 数值
    - 切图 `slices.size` 是显示尺寸（rpx），不自行缩放
@@ -242,7 +243,7 @@ margin: var(--spacing-sm);
 
 **正确做法：**
 1. **优先**：HTML Spec 中流式区域通常已给 `gap` / `margin-top` / `padding-top`，直接复制
-2. **Spec 缺间距时 fallback**（属于 §0 白名单 ⑥）：
+2. **Spec 缺间距时 fallback**（属于图像/公式 fallback 白名单）：
    - 从 sketch_annotations 取两个相邻元素的绝对 Y 坐标
    - `间距 = 下一个元素 top - 上一个元素 top - 上一个元素 height`
    - 例：标题 top=197rpx height=104rpx，subtitle top=310rpx → 间距 = 310-197-104 = 9rpx
@@ -256,14 +257,14 @@ margin: var(--spacing-sm);
 
 **识别信号：** 生成的代码中，某段文字的 `color` 值与其父容器（或祖先容器）的 `background-color` 相同或极度接近。
 
-**根因：** Spec 以 textLayer 为粒度记录文字颜色，但文字的**独立背景容器**（pill / badge / 渐变块）常是兄弟节点，HTML Spec 也可能没把它表达为该 text 的父容器。属于 SKILL.md §0 白名单 ②。
+**根因：** Spec 以 textLayer 为粒度记录文字颜色，但文字的**独立背景容器**（pill / badge / 渐变块）常是兄弟节点，HTML Spec 也可能没把它表达为该 text 的父容器。属于 SKILL.md 图像 fallback 白名单。
 
 **正确做法（白名单 ②，允许图像分析）：**
 1. 对每个文字元素，对比其 `color` 与最近祖先的 `background-color`
 2. 相同或极度接近（对比度不足）→ **立即标记 `⚠ 可见性问题`**
 3. 检查 layer tree 中该文字元素的兄弟节点 —— 是否存在背景 shape（`Rectangle`、`Ellipse`、带 `fill` 的 shapeLayer）
 4. **有兄弟 shape**：把 shape 的 `width / height / border-radius / fill` 提取出来，让文字包裹在带该背景的容器中（pill / badge）；优先从 HTML Spec 找该 shape 的 CSS，找不到再图像分析其色值
-5. **无兄弟 shape**：文字颜色可能记录错误，按 §0 白名单 ② 用图像分析重新提取颜色
+5. **无兄弟 shape**：文字颜色可能记录错误，按图像 fallback 白名单用图像分析重新提取颜色
 6. 在缓存「图像分析 fallback 来源标注」段写明本次提取来源
 
 **自检方法：** 在代码中搜索所有 `color: #FFFFFF` 或 `color: white` 的文字，逐一确认其父容器背景色不是白色。
@@ -284,8 +285,8 @@ margin: var(--spacing-sm);
 3. 数据查找顺序：
    - **优先**：当前设计稿的 HTML Spec
    - **其次**：Design Tokens
-   - **fallback**：layer_tree / sketch_annotations（§0 白名单 ⑥）
-   - **最后**：图像分析（仅 §0 白名单场景）
+   - **fallback**：layer_tree / sketch_annotations（图像/公式 fallback 白名单）
+   - **最后**：图像分析（仅白名单场景）
    - **禁止**：从项目其他页面的代码中推断
 4. 建立验证习惯：复用已有值前，先问"当前 Spec 有明确的不同值吗？"
 
@@ -302,7 +303,7 @@ margin: var(--spacing-sm);
 - 包含状态词（"已完成"、"进行中"、"未核销"）
 - 标题中包含冒号分隔的关键信息（"人数：X"）
 
-**根因：** 蓝湖/Figma 标注以 textLayer 为粒度输出，一个 textLayer 只有一个颜色值。但实际设计中经常出现同一行文字内部部分字符颜色不同（富文本），这些信息在数据层面丢失了。属于 SKILL.md §0 白名单 ①。
+**根因：** 蓝湖/Figma 标注以 textLayer 为粒度输出，一个 textLayer 只有一个颜色值。但实际设计中经常出现同一行文字内部部分字符颜色不同（富文本），这些信息在数据层面丢失了。属于 SKILL.md 图像 fallback 白名单。
 
 **正确做法（白名单 ①，允许图像分析）：**
 1. **触发条件**：文本内容包含数字、状态词、或冒号后的关键信息

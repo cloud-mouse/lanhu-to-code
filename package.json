@@ -1,6 +1,6 @@
 {
   "name": "lanhu-to-code",
-  "version": "2.2.0",
+  "version": "3.0.0",
   "description": "Claude Code Skill — 根据蓝湖链接或设计稿图片，生成 1:1 像素级还原的前端代码，自动识别项目技术栈",
   "keywords": [
     "claude-code",

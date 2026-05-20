@@ -2,6 +2,8 @@
 
 > Claude Code Skill — 根据蓝湖链接或设计稿图片，自动识别项目技术栈，生成 **1:1 像素级还原**的前端代码
 
+**v3.0：** 默认「内容校对 → 确认后缓存」；可命中已有缓存 fast-path；Spec 与视觉矛盾时须待用户确认，禁止自动用图覆盖。详见根目录 `SKILL.md`。
+
 ## 它能做什么？
 
 给 Claude Code 一个蓝湖设计稿链接或设计图截图，它会：
@@ -17,30 +19,32 @@
 用户输入（蓝湖 URL / 设计图）
         │
         ▼
-[1] 技术栈检测（含 UNIT_STRATEGY）+ 蓝湖 MCP 三步 + 下载切图 + 项目上下文 → 任务启动 ACK
-        │  (等用户在 ACK 确认设计图选哪张、UNIT_STRATEGY、改造范围)
+[1] 准备数据：技术栈（含 UNIT_STRATEGY）+ 蓝湖 MCP analyze(compact) + slices + 项目上下文
         ▼
-[2] 以 HTML+CSS Spec 迁移到目标框架（数值原样，结构适配）+ §0 白名单内允许图像分析 fallback
+[2] 内容校对：区域视觉巡检（必要时）+ 元素勾选清单 + CSS 对照表 → 等用户确认 → 立即写缓存
         │
         ▼
-[3] Fidelity Audit + 四项校验 + pitfalls + 编译（可选视觉核对遗漏）
+[3] 生成代码：以 HTML+CSS Spec 迁移到目标框架（数值原样，结构适配）
+        │
+        ▼
+[4] 验证交付：Fidelity Audit + 四项校验 + pitfalls + 编译
 ```
 
 ### 核心机制
 
 | 机制 | 说明 |
 |------|------|
-| **HTML+CSS Spec 主源** | `lanhu_get_ai_analyze_design_result` 返回的 CSS 为数值主源，Tokens/layer 仅补充缺项 |
-| **§0 图像分析白名单** | 富文本分色 / 独立背景容器 / 缺端点的渐变 / 切图含背景判定 / Spec 矛盾 / 坐标 fallback 才允许图像分析 |
-| **任务启动 ACK** | 数据准备完成后强制输出确认清单，用户在生成代码前介入岔路口 |
-| **Fidelity Audit** | 10 项固定 schema，逐项对照 Spec，失败必须修复 |
+| **HTML+CSS Spec 主源** | analyze 返回的 CSS 为数值主源，Tokens/layer 只补缺项 |
+| **内容先确认并缓存** | 写代码前输出元素勾选清单 + CSS 对照表 + 交互清单；用户确认后立即写缓存，抗上下文压缩 |
+| **图像分析白名单** | 富文本分色 / 独立背景容器 / 缺端点渐变 / 切图背景 / 坐标公式 fallback；**Spec 矛盾须待用户确认**，禁止自动用图覆盖 Spec |
+| **compact + 分批 + 最小 include** | analyze 默认 compact，只取 html+tokens；layers/image/slices 按需分开调用，全部页面按 ≤3 张 design 分批 |
+| **Fidelity Audit** | 交付前逐项对照 Spec，失败必须修复 |
 | **四项强制校验** | 可见性 → 跨页复制 → 富文本 → 切图背景，交付前必做 |
 | **UNIT_STRATEGY** | 自动检测 rpx / rem / px；移动 UI 库无适配方案时输出警告 |
 | **元素精准分类** | DOM 与切图分工明确，本地资源、不用 CDN |
 | **所见即所出** | 设计稿元素全还原，不添加 Spec 外内容 |
-| **24 个失败模式** | `references/pitfalls.md` 生成前扫信号、交付前逐条核对 |
-| **改造先确认** | 改造现有页时按固定 schema 列变更清单，用户确认后再改 |
-| **缓存有效性规则** | 第二轮修正按 design_name / 时间 / 用户指示决定是否重新 analyze |
+| **命中缓存 fast-path** | 同 URL / design / `UNIT_STRATEGY` 且用户未换稿时，可沿用 `lanhu-cache` 跳过重复清单（见 `SKILL.md` §2.5） |
+| **第二轮定点修正** | 用户反馈后只改问题区域，优先读缓存，不全量重写 |
 
 ## 安装
 
@@ -65,6 +69,10 @@ git clone https://github.com/cloud-mouse/lanhu-to-code.git
 # 复制到 Claude Code skills 目录
 cp -r lanhu-to-code ~/.claude/skills/lanhu-to-code
 ```
+
+### Cursor IDE
+
+将仓库复制或符号链接到 `~/.cursor/skills/lanhu-to-code`（个人全局）或 `<项目根>/.cursor/skills/lanhu-to-code`（仅本项目）。目录内需包含 `SKILL.md`、`references/`、`scripts/`（与仓库结构一致）。
 
 ### 方式四：从源码链接（适合开发者）
 
@@ -161,7 +169,8 @@ lanhu-to-code/
 │   ├── image-input-guide.md              # 图片输入降级策略
 │   ├── framework-patterns.md             # 各框架代码模板
 │   ├── layout-patterns.md                # 常见移动端布局模式速查
-│   └── pitfalls.md                       # 24 个常见失败模式
+│   ├── pitfalls-signals.md               # pitfalls 24 条识别信号速查（控上下文）
+│   └── pitfalls.md                       # 24 个常见失败模式（全文）
 ├── install.js                            # 安装脚本
 ├── package.json
 ├── LICENSE
@@ -208,7 +217,7 @@ python lanhu_mcp_server.py
 
 > 如果不配置蓝湖 MCP，仍然可以通过设计图图片方式使用本 skill，但精度会降低（视觉分析 vs 精确设计数据）。
 
-**MCP 调用顺序：** `lanhu_get_designs` → `lanhu_get_ai_analyze_design_result` → `lanhu_get_design_slices`（每张设计图各调一次 slices）。
+**MCP 调用顺序：** 以实际 MCP schema 为准，按「列表 → 分析 → 切图」职责调用。典型实现是 `lanhu_get_designs` → `lanhu_get_ai_analyze_design_result(compact: true)` → `lanhu_get_design_slices`。
 
 ## 工作流程示例
 
@@ -217,11 +226,10 @@ python lanhu_mcp_server.py
 
 Claude Code：
 [1] 技术栈检测 → Vue3 + Element Plus + UNIT_STRATEGY: px
-[2] lanhu_get_designs → 用户确认设计图名称
-    lanhu_get_ai_analyze_design_result → 获取 HTML+CSS Spec
-    lanhu_get_design_slices + 下载本地 assets
-[3] 按 Spec 生成 Vue SFC，Token 完全匹配处映射 var(--primary)
-[4] Fidelity Audit 10 项通过 + 四项校验 + npm run build
+[2] 蓝湖 MCP 列表/分析/切图 → 获取 HTML+CSS Spec + 本地 assets
+[3] 输出元素勾选清单 + CSS 对照表 → 等你确认
+[4] 按 Spec 生成 Vue SFC，Token 完全匹配处映射 var(--primary)
+[5] Fidelity Audit 通过 + 四项校验 + npm run build
       ✓ src/pages/invite/index.vue
       ⚠ 未映射 token: #FFEDD8
 ```
@@ -238,14 +246,15 @@ Claude Code：
 
 ### 生成的代码质量如何保证？
 
-Skill 内置了三重防线：
+Skill 内置了四重防线：
 
-- **10 项 Fidelity Audit**（逐项对照 HTML Spec）
-- **4 项强制校验**（可见性 / 跨页复制 / 富文本 / 切图背景）
-- **24 个常见失败模式**自检清单（`references/pitfalls.md`）
+- **内容校对**：写代码前先确认元素勾选清单 + CSS 对照表
+- **Fidelity Audit**：交付前逐项对照 HTML Spec
+- **四项强制校验**（可见性 / 跨页复制 / 富文本 / 切图背景）
+- **24 个常见失败模式**自检清单（`references/pitfalls-signals.md` + `references/pitfalls.md`）
 
 加上：
-- 任务启动 ACK 让用户在生成前确认岔路口（设计图选哪张、改造范围、UNIT_STRATEGY）
+- compact + 分批避免上下文膨胀
 - Spec 局限场景的图像分析 fallback 受白名单约束，越界一律标注
 - 使用项目已有的组件和设计 token，代码完整不省略
 

@@ -1,6 +1,6 @@
 # CSS 值提取与数据驱动尺寸计算
 
-> v2.2 — 与 SKILL.md 数据权威优先级 + §0 白名单对齐。
+> v3.0 — 与 SKILL.md 数据权威优先级 + 图像 fallback 白名单对齐。
 
 ## 数据权威优先级
 
@@ -9,7 +9,7 @@
 | 1 | `lanhu_get_ai_analyze_design_result` 返回的 **HTML+CSS** | 所有 CSS 属性值的主源 |
 | 2 | Design Tokens（analyze 附带） | 仅当 HTML **缺少**某属性时补充（渐变、阴影等） |
 | 3 | layer_tree / sketch_annotations | 仅当 HTML 与 Tokens 均缺项时的 fallback（坐标公式） |
-| 4 | 设计截图 + 图像分析 | 仅 `SKILL.md §0` 白名单场景；其他情形仅核对元素是否遗漏，**不改 Spec 数值** |
+| 4 | 设计截图 + 图像分析 | 仅 `SKILL.md` 图像 fallback 白名单场景；其他情形仅核对元素是否遗漏，**不改 Spec 数值** |
 
 生成代码时：**先复制 Spec 中的 CSS，再按 `UNIT_STRATEGY` 做单位换算。**
 
@@ -35,7 +35,7 @@
 
 ## 单位换算规则
 
-**基准（与 `SKILL.md §2.2` 一致）：逻辑 375px / 物理 750px。**
+**基准（与 `SKILL.md §1.2` 一致）：逻辑 375px / 物理 750px。**
 
 以 `detect-tech-stack.sh` 输出的 `UNIT_STRATEGY` 为准：
 
@@ -45,7 +45,7 @@
 | `rem` | ÷ root font-size | ÷ 2 ÷ root | ÷ root |
 | `px` | 1:1 | ÷ 2 | 1:1 |
 
-完整示例见 `SKILL.md §2.2`，本文档不重复。
+完整示例见 `SKILL.md §1.2`，本文档不重复。
 
 ---
 
